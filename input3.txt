@@ -1,11 +1,15 @@
-<<<<<<< HEAD
-const a 5;
-var x;
+var f, n;
+procedure fact;
+var ans1;
 begin
-  x := 1;
-=======
-var x, x;
+ans1:=n;
+n:= n-1;
+if n = 0 then f := 1fi;
+if n > 0 then call fact fi;
+f:=f*ans1;
+end;
 begin
-    x := 2;
->>>>>>> d8befeb0d8b174cb7b7001b5791a7baa02b15e1b
+n:=3;
+call fact;
+write f
 end.

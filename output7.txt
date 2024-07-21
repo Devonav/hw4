@@ -1,1 +1,7 @@
-Error: Error number 7, statement expected
+Source Program:
+var x, y;
+begin
+  x := y + 1;
+end.
+
+No errors, program is syntactically correct

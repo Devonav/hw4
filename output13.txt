@@ -1,1 +1,11 @@
-Error: Error number 13, assignment operator expected
+Source Program:
+var x, y;
+procedure 123;
+begin
+    x := y * 2;
+end;
+begin
+    x := y + 1;
+end.
+
+Error: Incorrect symbol after procedure declaration

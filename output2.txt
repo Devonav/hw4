@@ -1,1 +1,8 @@
-Error: Error number 2, = must be followed by a number
+Source Program:
+const a = x;
+var x;
+begin
+  x := 1;
+end.
+
+Error: Constants must be assigned an integer value

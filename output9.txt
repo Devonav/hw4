@@ -1,1 +1,7 @@
-Error: Error number 9, period expected
+Source Program:
+var x, y;
+begin
+  if x > y then x := x + 1;
+end.
+
+No errors, program is syntactically correct

@@ -1,11 +1,4 @@
-<<<<<<< HEAD
-const a = x;
-var x;
+var x, y;
 begin
-  x := 1;
-=======
-var ;
-begin
-    x := 2;
->>>>>>> d8befeb0d8b174cb7b7001b5791a7baa02b15e1b
-end.
+x := y + 56
+end

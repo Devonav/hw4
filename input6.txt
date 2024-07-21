@@ -1,14 +1,3 @@
-<<<<<<< HEAD
-procedure 123;
+procedure proc1
 begin
-  x := 1;
-end;
-begin
-  x := 2;
-=======
-var x, y
-begin
-    y := 3;
-    x := y + 56;
->>>>>>> d8befeb0d8b174cb7b7001b5791a7baa02b15e1b
 end.

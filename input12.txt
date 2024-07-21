@@ -1,11 +1,8 @@
-<<<<<<< HEAD
-const a = 5;
-begin
-  a := 1;
-=======
 var x, y;
+procedure proc
 begin
-    while x > y
-        x := y;
->>>>>>> d8befeb0d8b174cb7b7001b5791a7baa02b15e1b
+    x := y * 2;
+end;
+begin
+    x := y + 1;
 end.

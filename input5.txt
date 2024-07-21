@@ -1,11 +1,3 @@
-<<<<<<< HEAD
-var x y;
+procedure ;
 begin
-  x := 1;
-=======
-const x = y;
-var y;
-begin
-    y := 2;
->>>>>>> d8befeb0d8b174cb7b7001b5791a7baa02b15e1b
 end.

@@ -1,9 +1,8 @@
-const x = 5;
+const a = 5;
+var x;
+procedure proc1;
 begin
-<<<<<<< HEAD
-  x := 1
-  y := 2;
-=======
-    x := 3;
->>>>>>> d8befeb0d8b174cb7b7001b5791a7baa02b15e1b
+end;
+begin
+a := 10;
 end.

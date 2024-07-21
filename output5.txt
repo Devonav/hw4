@@ -1,1 +1,7 @@
-Error: Error number 5, semicolon or comma missing
+Source Program:
+var x, y;
+begin
+  x := y + 1
+end
+
+Error: Period expected

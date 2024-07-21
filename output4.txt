@@ -1,1 +1,10 @@
-Error: Error number 4, var must be followed by identifier
+Source Program:
+procedure proc1;
+begin
+  proc1 := 1;
+end;
+begin
+  proc1;
+end.
+
+Error: Assignment to constant or procedure is not allowed

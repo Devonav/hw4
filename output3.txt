@@ -1,1 +1,8 @@
-Error: Error number 3, identifier must be followed by =
+Source Program:
+const a = 1, b = 2;
+var x;
+begin
+  a := 1;
+end.
+
+Error: Assignment to constant or procedure is not allowed

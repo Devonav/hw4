@@ -1,1 +1,8 @@
-Error: Error number 15, call of a constant or variable is meaningless
+Source Program:
+var x, y;
+begin
+    call;
+    x := y + 1;
+end.
+
+Error: call must be followed by an identifier

@@ -1,1 +1,7 @@
-Error: Error number 10, semicolon between statements missing
+Source Program:
+var x;
+begin
+  while x > 1 do x := x - 1;
+end.
+
+No errors, program is syntactically correct

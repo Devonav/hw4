@@ -1,7 +1,8 @@
-var x;
-procedure p;
+var x, y;
+procedure proc;
 begin
-  x := 1
+    x := y + 1
+end;
 begin
-  call p;
+    call proc;
 end.

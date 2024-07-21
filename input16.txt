@@ -1,4 +1,4 @@
-var x;
+const a = 1;
 begin
-  if x = 1 x := 2;
+    call a;
 end.

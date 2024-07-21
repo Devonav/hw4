@@ -1,8 +1,4 @@
-var x, y;
+const a = 1;
 begin
-<<<<<<< HEAD
-  call;
-=======
-    x := (y + 2;
->>>>>>> d8befeb0d8b174cb7b7001b5791a7baa02b15e1b
+    a := 2;
 end.

@@ -1,1 +1,8 @@
-Error: Error number 6, incorrect symbol after procedure declaration
+Source Program:
+var x, y;
+begin
+  read x
+  x := y + 1;
+end.
+
+Error: Semicolon between statements missing

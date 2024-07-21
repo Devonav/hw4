@@ -1,1 +1,11 @@
-Error: Error number 18, do expected
+Source Program:
+var x, y;
+procedure proc;
+begin
+    x := y + 1;
+end;
+begin
+    x := proc + 1;
+end.
+
+Error: Expression cannot contain a procedure identifier
