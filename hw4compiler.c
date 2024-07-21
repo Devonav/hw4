@@ -354,6 +354,8 @@ int symbol_table_check(const char *name) {
     return -1;
 }
 
+
+
 // Function to add a symbol to the symbol table
 void add_symbol(int kind, const char *name, int val, int level, int addr) {
     if (symbol_count >= MAX_SYMBOL_TABLE_SIZE) {
@@ -385,10 +387,9 @@ void mark_all_symbols() {
         symbol_table[i].mark = 1;
     }
 }
-
 void program() {
     emit("JMP", 0, 3);
-    block(0, 0);
+    block(0, 0);  // Pass the initial level and tx
     if (lexemes[current_token].token != periodsym) {
         error("program must end with period", NULL);
     }
@@ -396,16 +397,13 @@ void program() {
     mark_all_symbols();
 }
 
+
 // Block is a helper function for program that handles the base case of the recursion and the different types of blocks that can be declared
 void block(int level, int tx) {
-    int dx = 3, tx0 = tx, cx0 = code_index;
-    if (level > MAX_LEVEL) {
-        error("maximum block level exceeded", NULL);
-    }
-    symbol_table[tx].addr = code_index;
-    emit("JMP", 0, 0);
     const_declaration();
     int numVars = var_declaration();
+    emit("INC", 0, 3 + numVars);
+
     while (lexemes[current_token].token == procsym) {
         current_token++;
         if (lexemes[current_token].token != identsym) {
@@ -417,16 +415,14 @@ void block(int level, int tx) {
             error("semicolon expected after procedure declaration", NULL);
         }
         current_token++;
-        block(level + 1, tx);
+        block(level + 1, tx);  // Pass the correct parameters
         if (lexemes[current_token].token != semicolonsym) {
             error("semicolon expected after procedure block", NULL);
         }
         current_token++;
     }
-    code[symbol_table[tx0].addr].m = code_index;
-    emit("INC", level, dx + numVars);
+
     statement();
-    emit("OPR", 0, 0);
 }
 
 
@@ -488,32 +484,6 @@ int var_declaration() {
 }
 
 // procedure_declaration is a helper function for block that handles the declaration of procedures
-void procedure_declaration(int level, int *tx, int *dx) {
-    while (lexemes[current_token].token == procsym) {
-        current_token++;
-        if (lexemes[current_token].token != identsym) {
-            error("procedure must be followed by identifier", NULL);
-        }
-        char procName[MAX_IDENT_LEN + 1];
-        strcpy(procName, lexemes[current_token].lexeme);
-        current_token++;
-        if (lexemes[current_token].token != semicolonsym) {
-            error("semicolon expected after procedure declaration", NULL);
-        }
-        current_token++;
-        
-        int procIndex = code_index;
-        add_symbol(3, procName, 0, level, procIndex);
-        current_level++;
-        block(level + 1, *tx);
-        if (lexemes[current_token].token != semicolonsym) {
-            error("semicolon expected after procedure block", NULL);
-        }
-        current_token++;
-        emit("RTN", 0, 0);
-        current_level--;
-    }
-}
 void statement() {
     printf("Debug: Entering statement with token: %d (%s)\n", lexemes[current_token].token, lexemes[current_token].lexeme);
 
@@ -527,10 +497,10 @@ void statement() {
 
         // Check if the symbol is a constant or a procedure
         if (symbol_table[symIdx].kind == 1) {
-            error("assignment to constant is not allowed", lexemes[current_token].lexeme);
+            error("Assignment to constant is not allowed", NULL);
         }
         if (symbol_table[symIdx].kind == 3) {
-            error("assignment to procedure is not allowed", lexemes[current_token].lexeme);
+            error("Assignment to procedure is not allowed", NULL);
         }
 
         current_token++;
@@ -539,15 +509,19 @@ void statement() {
         }
 
         current_token++;
+        printf("Debug: Processing assignment statement for %s\n", lexemes[current_token - 2].lexeme);
         expression();
         emit("STO", current_level - symbol_table[symIdx].level, symbol_table[symIdx].addr);
     } else if (lexemes[current_token].token == beginsym) {
         printf("Debug: Processing begin block\n");
         current_token++;
-        statement();
-        while (lexemes[current_token].token == semicolonsym) {
-            current_token++;
+        while (lexemes[current_token].token != endsym) {
             statement();
+            if (lexemes[current_token].token == semicolonsym) {
+                current_token++;
+            } else if (lexemes[current_token].token != endsym) {
+                error("semicolon expected between statements or at end of block", NULL);
+            }
         }
         if (lexemes[current_token].token != endsym) {
             error("begin must be followed by end", NULL);
@@ -598,13 +572,17 @@ void statement() {
         emit("SYS", 0, 1); // Assuming SYS 1 is write
     } else if (lexemes[current_token].token == callsym) {
         current_token++;
+        printf("Debug: Processing call statement\n");
         if (lexemes[current_token].token != identsym) {
             error("call must be followed by an identifier", NULL);
         }
         int symIdx = symbol_table_check(lexemes[current_token].lexeme);
         printf("Debug: Processing call with symIdx: %d\n", symIdx);
-        if (symIdx == -1 || symbol_table[symIdx].kind != 3) {
-            error("call must be followed by a procedure identifier", lexemes[current_token].lexeme);
+        if (symIdx == -1) {
+            error("undeclared identifier", NULL);
+        }
+        if (symbol_table[symIdx].kind != 3) {
+            error("call of a constant or variable is meaningless", NULL);
         }
         current_token++;
         emit("CAL", current_level - symbol_table[symIdx].level, symbol_table[symIdx].addr);
@@ -613,8 +591,6 @@ void statement() {
         error("Invalid statement", lexemes[current_token].lexeme);
     }
 }
-
-
 
 
 // condition is a helper function for statement that handles the different types of conditions that can be declared in a statement
@@ -648,12 +624,7 @@ void condition() {
 
 // expression is a helper function for condition that handles the different types of expressions that can be declared in a condition
 void expression() {
-    if (lexemes[current_token].token == identsym) {
-        int symIdx = symbol_table_check(lexemes[current_token].lexeme);
-        if (symIdx != -1 && symbol_table[symIdx].kind == 3) {
-            error("Expression cannot contain a procedure identifier", lexemes[current_token].lexeme);
-        }
-    }
+    printf("Debug: Entering expression with token: %d (%s)\n", lexemes[current_token].token, lexemes[current_token].lexeme);
 
     if (lexemes[current_token].token == plussym || lexemes[current_token].token == minussym) {
         token_type addOp = lexemes[current_token].token;
@@ -665,6 +636,7 @@ void expression() {
     } else {
         term();
     }
+
     while (lexemes[current_token].token == plussym || lexemes[current_token].token == minussym) {
         token_type addOp = lexemes[current_token].token;
         current_token++;
@@ -677,31 +649,40 @@ void expression() {
     }
 }
 
-// term is a helper function for expression that handles the different types of terms that can be declared in an expression
 void term() {
+    printf("Debug: Entering term with token: %d (%s)\n", lexemes[current_token].token, lexemes[current_token].lexeme);
     factor();
     while (lexemes[current_token].token == multsym || lexemes[current_token].token == slashsym) {
         token_type mulOp = lexemes[current_token].token;
         current_token++;
         factor();
         if (mulOp == multsym) {
-            emit("MUL", 0, 0); // Assuming MUL is OPR 0 2, if different, adjust accordingly
+            emit("MUL", 0, 0);
         } else {
-            emit("DIV", 0, 0); // Assuming DIV is OPR 0 4, if different, adjust accordingly
+            emit("DIV", 0, 0);
         }
     }
 }
 
-// factor is a helper function for term that handles the different types of factors that can be declared in a term
 void factor() {
+    printf("Debug: Entering factor with token: %d (%s)\n", lexemes[current_token].token, lexemes[current_token].lexeme);
+
     if (lexemes[current_token].token == identsym) {
         int symIdx = symbol_table_check(lexemes[current_token].lexeme);
+        printf("Debug: Found identifier %s with symIdx: %d\n", lexemes[current_token].lexeme, symIdx);
+
         if (symIdx == -1) {
             error("undeclared identifier", lexemes[current_token].lexeme);
         }
-        if (symbol_table[symIdx].kind == 1) {
+
+        // Check if the symbol is a procedure
+        if (symbol_table[symIdx].kind == 3) {
+            error("Expression cannot contain a procedure identifier", NULL);
+        }
+
+        if (symbol_table[symIdx].kind == 1) { // Constant
             emit("LIT", 0, symbol_table[symIdx].val);
-        } else {
+        } else { // Variable
             emit("LOD", current_level - symbol_table[symIdx].level, symbol_table[symIdx].addr);
         }
         current_token++;

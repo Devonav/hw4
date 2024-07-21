@@ -1,8 +1,7 @@
-var x, y;
-procedure proc
+var x;
+procedure proc1;
 begin
-    x := y * 2;
 end;
 begin
-    x := y + 1;
+  proc1 := 10;
 end.

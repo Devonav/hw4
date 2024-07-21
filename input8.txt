@@ -1,8 +1,3 @@
-const a = 5;
-var x;
-procedure proc1;
 begin
-end;
-begin
-a := 10;
+call;
 end.

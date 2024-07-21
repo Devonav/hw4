@@ -1,5 +1,8 @@
-const a = 5;
 var x;
+procedure proc1
 begin
-call a;
+end;
+begin
+  x := 5
+  call proc1;
 end.

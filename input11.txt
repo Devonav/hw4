@@ -3,5 +3,5 @@ procedure proc1;
 begin
 end;
 begin
-x := proc1 + 1;
+  x := 5 + proc1;
 end.
