@@ -1,0 +1,9 @@
+var x, y;
+begin
+<<<<<<< HEAD
+  x := 1
+  y := 2;
+end.
+=======
+    x := 3;
+>>>>>>> d8befeb0d8b174cb7b7001b5791a7baa02b15e1b

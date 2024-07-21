@@ -1,0 +1,11 @@
+<<<<<<< HEAD
+const a = ;
+var x, y;
+begin
+    x := y * 2;
+=======
+var x;
+begin
+    y := 3;
+>>>>>>> d8befeb0d8b174cb7b7001b5791a7baa02b15e1b
+end.

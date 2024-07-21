@@ -1,0 +1,1 @@
+Error: Error number 24, an expression cannot begin with this symbol

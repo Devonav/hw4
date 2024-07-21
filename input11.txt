@@ -1,0 +1,8 @@
+var x, y;
+begin
+<<<<<<< HEAD
+  x := y + 1;
+=======
+    if x > y do x := y;
+>>>>>>> d8befeb0d8b174cb7b7001b5791a7baa02b15e1b
+end.

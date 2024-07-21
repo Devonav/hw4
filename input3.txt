@@ -1,0 +1,11 @@
+<<<<<<< HEAD
+const a 5;
+var x;
+begin
+  x := 1;
+=======
+var x, x;
+begin
+    x := 2;
+>>>>>>> d8befeb0d8b174cb7b7001b5791a7baa02b15e1b
+end.

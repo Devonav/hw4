@@ -1,0 +1,1 @@
+Error: Error number 8, incorrect symbol after statement part in block

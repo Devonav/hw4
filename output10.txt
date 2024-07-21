@@ -1,0 +1,1 @@
+Error: Error number 10, semicolon between statements missing

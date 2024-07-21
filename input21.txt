@@ -1,0 +1,4 @@
+var x, y;
+begin
+    while x < 2 then x := y * 2;
+end.

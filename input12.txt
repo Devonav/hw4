@@ -1,0 +1,11 @@
+<<<<<<< HEAD
+const a = 5;
+begin
+  a := 1;
+=======
+var x, y;
+begin
+    while x > y
+        x := y;
+>>>>>>> d8befeb0d8b174cb7b7001b5791a7baa02b15e1b
+end.

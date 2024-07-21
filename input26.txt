@@ -1,0 +1,4 @@
+var xxxxxxxxxxxxxx;
+begin
+  x := 2;
+end.
