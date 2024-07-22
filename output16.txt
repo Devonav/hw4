@@ -1,7 +1,0 @@
-Source Program:
-const a = 1;
-begin
-    call a;
-end.
-
-Error: Call of a constant or variable is meaningless

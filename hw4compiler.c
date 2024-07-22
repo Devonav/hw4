@@ -1,113 +1,215 @@
 /*
-July 7, 2024
-COP 3402 Systems Software Assignment 3
-This program is written by: Devon Villalona and Izaac Plambeck
-HW4: Pl-0 Tiny complier with Procedures and Call Statements
-*/
+ * COP 3402: Systems Software
+ * 
+ * Authors: Devon Villalona, Izaac Plambeck
+ * 
+ * Description:
+ * This program implements a PL/0 compiler which performs lexical analysis,
+ * parsing, and code generation to produce executable code for a Virtual Machine (VM).
+ * 
+ * University of Central Florida
+ * Department of Computer Science
+ * Summer 2024
+ * Homework #4 (PL/0 Compiler)
+ * Due: July 21st, 2024
+ */
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <ctype.h>
 #include <string.h>
+#include <ctype.h>
 
-#define MAX_IDENT_LEN 11
-#define MAX_NUM_LEN 5
+// Define the max values
 #define MAX_LEXEMES 1000
+#define MAX_TOKENS 1000
+#define MAX_SOURCE_SIZE 10000
+#define MAX_IDENTIFIER_LENGTH 11
+#define MAX_NUMBER_LENGTH 5
 #define MAX_SYMBOL_TABLE_SIZE 500
 #define MAX_CODE_LENGTH 500
-#define MAX_LEVEL 3
-#define PROC_SPACE 4 // Space required for procedure calls
 
-// token_type enum
+// Enum for token types
 typedef enum {
     oddsym = 1, identsym, numbersym, plussym, minussym,
-    multsym, slashsym, fisym, eqlsym, neqsym, lessym, leqsym,
+    multsym, slashsym, nulsym, eqsym, neqsym, lessym, leqsym,
     gtrsym, geqsym, lparentsym, rparentsym, commasym, semicolonsym,
     periodsym, becomessym, beginsym, endsym, ifsym, thensym,
     whilesym, dosym, callsym, constsym, varsym, procsym, writesym,
-    readsym, elsesym, errorsym
+    readsym, elsesym, fisym, error_token
 } token_type;
 
+// Lexeme structure
 typedef struct {
-    char lexeme[MAX_IDENT_LEN + 1];
+    char lexeme[12];
     token_type token;
-    char error[50];
+    char errorMessage[50];
 } Lexeme;
 
+// Token structure
+typedef struct {
+    token_type token;
+    char value[12];
+} Token;
+
+// Symbol structure
 typedef struct {
     int kind; // const = 1, var = 2, proc = 3
-    char name[MAX_IDENT_LEN + 1];
-    int val;
-    int level;
-    int addr;
-    int mark;
+    char name[10]; // name up to 11 chars
+    int val; // number (ASCII value)
+    int level; // L level
+    int addr; // M address
+    int mark; // to indicate unavailable or deleted
 } symbol;
 
+// Instruction structure
 typedef struct {
-    char op[4];
+    int op;
     int l;
     int m;
 } instruction;
 
-// Global variables
-Lexeme lexemes[MAX_LEXEMES];
-int lexeme_count = 0;
-int current_token = 0;
-symbol symbol_table[MAX_SYMBOL_TABLE_SIZE];
-int symbol_count = 0;
-instruction code[MAX_CODE_LENGTH];
-int code_index = 0;
-int current_level = 0;
-char *reservedWords[] = {
-    "const", "var", "procedure", "call", "begin", "end", "if", "fi",
-    "then", "else", "while", "do", "read", "write"
-};
-token_type reservedTokens[] = {
-    constsym, varsym, procsym, callsym, beginsym, endsym, ifsym, fisym,
-    thensym, elsesym, whilesym, dosym, readsym, writesym
-};
+// Compiler state structure
+typedef struct {
+    Lexeme lexemes[MAX_LEXEMES];
+    Token tokens[MAX_TOKENS];
+    int lexemeCount;
+    int tokenCount;
+    int current_token;
+    symbol symbol_table[MAX_SYMBOL_TABLE_SIZE];
+    int symbol_table_index;
+    instruction code[MAX_CODE_LENGTH];
+    int code_index;
+} CompilerState;
 
-// Function prototypes
-void addLexeme(char *lex, token_type token, char *error);
-token_type identifyReservedWord(char *word);
-void processInput(const char *input);
-void readInputFile(const char *filename, char *buffer, int size);
-void writeOutputFile(const char *filename);
-void writeElfFile(const char *filename);
-void program();
-void block(int level, int tx);
-void const_declaration();
-int var_declaration();
-void procedure_declaration(int level, int *tx, int *dx);
-void statement();
-void condition();
-void expression();
-void term();
-void factor();
-int symbol_table_check(const char *name);
-void add_symbol(int kind, const char *name, int val, int level, int addr);
-void emit(const char *op, int l, int m);
-void error(const char *message, const char *detail);
-void mark_all_symbols();
-void displayInput(const char *input);
-void displayGeneratedCode();
+// Function declarations
+void initializeCompilerState(CompilerState *state);
+void lexicalAnalyzer(const char *source, CompilerState *state);
+void addLexeme(CompilerState *state, const char *lexeme, token_type token, const char *errorMessage);
+void addToken(CompilerState *state, token_type token, const char *value);
+token_type getReservedWordToken(const char *word);
+token_type getSpecialSymbolToken(const char *symbol);
+void printLexicalOutput(const CompilerState *state, FILE *outputFile);
+void print_error(int error_number, const char *message, const char *identifier, FILE *errorFile);
+int parseProgram(CompilerState *state, FILE *errorFile);
+void block(CompilerState *state, FILE *errorFile, int level);
+void const_declaration(CompilerState *state, FILE *errorFile, int level);
+int var_declaration(CompilerState *state, FILE *errorFile, int level);
+void statement(CompilerState *state, FILE *errorFile, int level);
+void condition(CompilerState *state, FILE *errorFile, int level);
+void expression(CompilerState *state, FILE *errorFile, int level);
+void term(CompilerState *state, FILE *errorFile, int level);
+void factor(CompilerState *state, FILE *errorFile, int level);
+int symbol_table_check(CompilerState *state, char *name, int level);
+int symbol_table_check_declaration(CompilerState *state, char *name, int level);
+void add_to_symbol_table(CompilerState *state, int kind, char *name, int val, int level, int addr);
+void mark_symbols(CompilerState *state, int level);
+void emit(CompilerState *state, int op, int l, int m);
+void printCode(const CompilerState *state, FILE *outputFile);
+void outputElfFile(const CompilerState *state);
+void printsymbols(const CompilerState *state);
 
-// Function to add lexeme to the lexeme list
-void addLexeme(char *lex, token_type token, char *error) {
-    if (lexeme_count < MAX_LEXEMES) {
-        strcpy(lexemes[lexeme_count].lexeme, lex);
-        lexemes[lexeme_count].token = token;
-        if (error) {
-            strcpy(lexemes[lexeme_count].error, error);
-        } else {
-            lexemes[lexeme_count].error[0] = '\0';
-        }
-        lexeme_count++;
+int main(int argc, char *argv[]) {
+    if (argc != 2) {
+        printf("Usage: %s <source file>\n", argv[0]);
+        return 1;
     }
+
+    FILE *file = fopen(argv[1], "r");
+    if (!file) {
+        perror("Error opening file");
+        return 1;
+    }
+
+    char sourceProgram[MAX_SOURCE_SIZE];
+    size_t sourceSize = fread(sourceProgram, 1, MAX_SOURCE_SIZE - 1, file);
+    fclose(file);
+    sourceProgram[sourceSize] = '\0';
+
+    CompilerState state;
+    initializeCompilerState(&state);
+
+    lexicalAnalyzer(sourceProgram, &state);
+
+    FILE *lexOutputFile = fopen("lexOutput.txt", "w");
+    if (!lexOutputFile) {
+        perror("Error opening lexOutput.txt file");
+        return 1;
+    }
+
+    printLexicalOutput(&state, lexOutputFile);
+    fclose(lexOutputFile);
+
+    FILE *errorOutputFile = fopen("errorOutput.txt", "w");
+    if (!errorOutputFile) {
+        perror("Error opening errorOutput.txt file");
+        return 1;
+    }
+
+    if (!parseProgram(&state, errorOutputFile)) {
+        fprintf(stderr, "Compilation failed. See errorOutput.txt for details.\n");
+        fclose(errorOutputFile);
+        return 1;
+    }
+
+    fclose(errorOutputFile);
+
+    FILE *outputFile = fopen("output.txt", "w");
+    if (!outputFile) {
+        perror("Error opening output.txt file");
+        return 1;
+    }
+
+    printCode(&state, outputFile);
+    fclose(outputFile);
+
+    outputElfFile(&state);
+
+    printsymbols(&state);
+
+    return 0;
 }
 
-// Function to identify reserved words
-token_type identifyReservedWord(char *word) {
+// Initialize the compiler state
+void initializeCompilerState(CompilerState *state) {
+    state->lexemeCount = 0;
+    state->tokenCount = 0;
+    state->current_token = 0;
+    state->symbol_table_index = 0;
+    state->code_index = 0;
+}
+
+// Add a lexeme to the state
+void addLexeme(CompilerState *state, const char *lexeme, token_type token, const char *errorMessage) {
+    strncpy(state->lexemes[state->lexemeCount].lexeme, lexeme, sizeof(state->lexemes[state->lexemeCount].lexeme) - 1);
+    state->lexemes[state->lexemeCount].lexeme[sizeof(state->lexemes[state->lexemeCount].lexeme) - 1] = '\0';
+    state->lexemes[state->lexemeCount].token = token;
+    if (errorMessage != NULL) {
+        strncpy(state->lexemes[state->lexemeCount].errorMessage, errorMessage, sizeof(state->lexemes[state->lexemeCount].errorMessage) - 1);
+        state->lexemes[state->lexemeCount].errorMessage[sizeof(state->lexemes[state->lexemeCount].errorMessage) - 1] = '\0';
+    } else {
+        state->lexemes[state->lexemeCount].errorMessage[0] = '\0';
+    }
+    state->lexemeCount++;
+}
+
+// Add a token to the state
+void addToken(CompilerState *state, token_type token, const char *value) {
+    state->tokens[state->tokenCount].token = token;
+    strncpy(state->tokens[state->tokenCount].value, value, sizeof(state->tokens[state->tokenCount].value) - 1);
+    state->tokens[state->tokenCount].value[sizeof(state->tokens[state->tokenCount].value) - 1] = '\0';
+    state->tokenCount++;
+}
+
+// Get token for reserved words
+token_type getReservedWordToken(const char *word) {
+    static const char *reservedWords[] = {
+        "const", "var", "procedure", "call", "begin", "end", "if", "fi", "then",
+        "else", "while", "do", "read", "write"
+    };
+    static const token_type reservedTokens[] = {
+        constsym, varsym, procsym, callsym, beginsym, endsym, ifsym, fisym, thensym, elsesym, whilesym, dosym, readsym, writesym
+    };
+
     for (int i = 0; i < sizeof(reservedWords) / sizeof(reservedWords[0]); i++) {
         if (strcmp(word, reservedWords[i]) == 0) {
             return reservedTokens[i];
@@ -116,587 +218,569 @@ token_type identifyReservedWord(char *word) {
     return identsym;
 }
 
-// Function to process the input
-void processInput(const char *input) {
-    int length = strlen(input);
-    char buffer[MAX_IDENT_LEN + 1];
-    int buffer_index = 0;
+// Get token for special symbols
+token_type getSpecialSymbolToken(const char *symbol) {
+    static const char *specialSymbols[] = {
+        "+", "-", "*", "/", "(", ")", "=", ",", ".", "<", ">", ";", ":=", "<>"
+    };
+    static const token_type specialTokens[] = {
+        plussym, minussym, multsym, slashsym, lparentsym, rparentsym, eqsym, commasym, periodsym, lessym, gtrsym, semicolonsym, becomessym
+    };
 
-    for (int i = 0; i < length; i++) {
-        char c = input[i];
+    for (int i = 0; i < sizeof(specialSymbols) / sizeof(specialSymbols[0]); i++) {
+        if (strcmp(symbol, specialSymbols[i]) == 0) {
+            return specialTokens[i];
+        }
+    }
+    return nulsym;
+}
 
-        if (isspace(c)) continue;
+// Lexical analyzer
+void lexicalAnalyzer(const char *source, CompilerState *state) {
+    int i = 0;
+    while (source[i] != '\0') {
+        if (isspace(source[i])) {
+            i++;
+            continue;
+        }
 
-        if (isalpha(c)) {
-            buffer_index = 0;
-            while (isalnum(c) && buffer_index < MAX_IDENT_LEN) {
-                buffer[buffer_index++] = c;
-                c = input[++i];
+        // Handle comments
+        if (source[i] == '/' && source[i + 1] == '*') {
+            i += 2;
+            int comment_closed = 0;
+            while (source[i] != '\0') {
+                if (source[i] == '*' && source[i + 1] == '/') {
+                    i += 2;
+                    comment_closed = 1;
+                    break;
+                }
+                i++;
             }
-            buffer[buffer_index] = '\0';
-            if (isalnum(c)) {
-                while (isalnum(c)) c = input[++i];
-                addLexeme(buffer, errorsym, "Name too long");
+            if (!comment_closed) {
+                addLexeme(state, "/*", error_token, "Error: unclosed comment");
+                continue;
+            }
+            continue;
+        }
+
+        // Handle identifiers and reserved words
+        if (isalpha(source[i])) {
+            char buffer[12] = {0};
+            int j = 0;
+            while (isalnum(source[i]) && j < MAX_IDENTIFIER_LENGTH) {
+                buffer[j++] = source[i++];
+            }
+            buffer[j] = '\0'; // Ensure null-terminated
+            if (isalnum(source[i])) {
+                addLexeme(state, buffer, error_token, "Error: Identifier too long");
+                while (isalnum(source[i])) i++; // Skip the rest of the identifier
+                continue;
+            }
+            token_type token = getReservedWordToken(buffer);
+            addLexeme(state, buffer, token, NULL);
+            addToken(state, token, buffer);
+            continue;
+        }
+
+        // Handle numbers
+        if (isdigit(source[i])) {
+            char buffer[6] = {0};
+            int j = 0;
+            while (isdigit(source[i]) && j < MAX_NUMBER_LENGTH) {
+                buffer[j++] = source[i++];
+            }
+            buffer[j] = '\0';
+            if (isdigit(source[i])) {
+                addLexeme(state, buffer, error_token, "Error: Number too long");
+                while (isdigit(source[i])) i++;
+                continue;
+            }
+            addLexeme(state, buffer, numbersym, NULL);
+            addToken(state, numbersym, buffer);
+            continue;
+        }
+
+        // Handle complex token sequences and special symbols
+        char buffer[3] = {0};
+        buffer[0] = source[i++];
+        if ((buffer[0] == ':' && source[i] == '=') || (buffer[0] == '<' && source[i] == '>') ||
+            (buffer[0] == '<' && source[i] == '=') || (buffer[0] == '>' && source[i] == '=')) {
+            buffer[1] = source[i++];
+        }
+        token_type token = getSpecialSymbolToken(buffer);
+        if (token == nulsym) {
+            // Handle specific cases for two-character symbols
+            if (buffer[0] == '<' && buffer[1] == '>') {
+                token = neqsym;
+            } else if (buffer[0] == '<' && buffer[1] == '=') {
+                token = leqsym;
+            } else if (buffer[0] == '>' && buffer[1] == '=') {
+                token = geqsym;
+            } else if (buffer[0] == ':' && buffer[1] == '=') {
+                token = becomessym;
             } else {
-                token_type token = identifyReservedWord(buffer);
-                addLexeme(buffer, token, NULL);
+                addLexeme(state, buffer, error_token, "Error: Invalid symbol");
+                continue;
             }
-            i--;
-        } else if (isdigit(c)) {
-            buffer_index = 0;
-            while (isdigit(c) && buffer_index < MAX_NUM_LEN) {
-                buffer[buffer_index++] = c;
-                c = input[++i];
-            }
-            buffer[buffer_index] = '\0';
-            if (isdigit(c)) {
-                while (isdigit(c)) c = input[++i];
-                addLexeme(buffer, errorsym, "Number too long");
+        }
+        addLexeme(state, buffer, token, NULL);
+        addToken(state, token, buffer);
+    }
+}
+
+// Print lexical analysis output
+void printLexicalOutput(const CompilerState *state, FILE *outputFile) {
+    fprintf(outputFile, "Lexeme Table:\n");
+    fprintf(outputFile, "\nlexeme          token type\n");
+    for (int i = 0; i < state->lexemeCount; i++) {
+        fprintf(outputFile, "%-15s %-5d\n", state->lexemes[i].lexeme, state->lexemes[i].token);
+    }
+
+    fprintf(outputFile, "\nToken List:\n");
+    for (int i = 0; i < state->tokenCount; i++) {
+        fprintf(outputFile, "%d", state->tokens[i].token);
+        if (state->tokens[i].token == identsym || state->tokens[i].token == numbersym) {
+            fprintf(outputFile, " %s", state->tokens[i].value);
+        }
+        if (i < state->tokenCount - 1) {
+            fprintf(outputFile, " ");
+        }
+    }
+    fprintf(outputFile, "\n");
+}
+
+// Print error messages
+void print_error(int error_number, const char *message, const char *identifier, FILE *errorFile) {
+    if (identifier != NULL) {
+        fprintf(errorFile, "***** Error number %d: %s %s\n", error_number, message, identifier);
+    } else {
+        fprintf(errorFile, "***** Error number %d: %s\n", error_number, message);
+    }
+    exit(1);
+}
+
+// Recursive Descent Parser and Intermediate Code Generator
+
+int parseProgram(CompilerState *state, FILE *errorFile) {
+    emit(state, 7, 0, 3); // JMP to main block
+    block(state, errorFile, 0);
+    if (state->tokens[state->current_token].token != periodsym) {
+        print_error(9, "Period expected", NULL, errorFile);
+    }
+    emit(state, 9, 0, 3); // HALT
+
+    return 1; // No error
+}
+
+void block(CompilerState *state, FILE *errorFile, int level) {
+    int tx0 = state->symbol_table_index; // Save current table index
+    int dx = 3; // Data allocation index
+
+    int jmp_placeholder = state->code_index;
+    emit(state, 7, 0, 0); // JMP to main block, address to be filled later
+
+    do {
+        if (state->tokens[state->current_token].token == constsym) {
+            const_declaration(state, errorFile, level);
+        }
+        if (state->tokens[state->current_token].token == varsym) {
+            dx += var_declaration(state, errorFile, level);
+        }
+        while (state->tokens[state->current_token].token == procsym) {
+            state->current_token++;
+            if (state->tokens[state->current_token].token == identsym) {
+                add_to_symbol_table(state, 3, state->tokens[state->current_token].value, 0, level, state->code_index);
+                state->current_token++;
             } else {
-                addLexeme(buffer, numbersym, NULL);
+                print_error(4, "const, var, procedure must be followed by identifier", NULL, errorFile);
             }
-            i--;
+            if (state->tokens[state->current_token].token != semicolonsym) {
+                print_error(5, "Semicolon or comma missing", NULL, errorFile);
+            }
+            state->current_token++;
+            block(state, errorFile, level + 1);
+            if (state->tokens[state->current_token].token != semicolonsym) {
+                print_error(17, "Semicolon or end expected after block", NULL, errorFile);
+            }
+            state->current_token++;
+        }
+    } while (state->tokens[state->current_token].token == constsym || state->tokens[state->current_token].token == varsym || state->tokens[state->current_token].token == procsym);
+
+    int inc_index = state->code_index;  // Store the index of the INC instruction
+    state->code[jmp_placeholder].m = inc_index;  // Update JMP to main block with the correct address
+
+    emit(state, 6, 0, dx); // INC
+
+    statement(state, errorFile, level);
+    emit(state, 2, 0, 0); // OPR, return
+
+    mark_symbols(state, level);
+}
+
+void const_declaration(CompilerState *state, FILE *errorFile, int level) {
+    if (state->tokens[state->current_token].token == constsym) {
+        do {
+            state->current_token++;
+            if (state->tokens[state->current_token].token != identsym) {
+                print_error(4, "const, var, procedure must be followed by identifier", NULL, errorFile);
+            }
+            char const_name[12];
+            strcpy(const_name, state->tokens[state->current_token].value);
+
+            if (symbol_table_check_declaration(state, const_name, level) != -1) {
+                print_error(4, "symbol name has already been declared", const_name, errorFile);
+            }
+
+            state->current_token++;
+            if (state->tokens[state->current_token].token != eqsym) {
+                print_error(3, "Identifier must be followed by =", NULL, errorFile);
+            }
+
+            state->current_token++;
+            if (state->tokens[state->current_token].token != numbersym) {
+                print_error(2, "= must be followed by a number", NULL, errorFile);
+            }
+            int const_value = atoi(state->tokens[state->current_token].value);
+
+            add_to_symbol_table(state, 1, const_name, const_value, level, 0);
+
+            state->current_token++;
+        } while (state->tokens[state->current_token].token == commasym);
+
+        if (state->tokens[state->current_token].token != semicolonsym) {
+            print_error(5, "Semicolon or comma missing", NULL, errorFile);
+        }
+        state->current_token++;
+    }
+}
+
+int var_declaration(CompilerState *state, FILE *errorFile, int level) {
+    int numVars = 0;
+    if (state->tokens[state->current_token].token == varsym) {
+        do {
+            numVars++;
+            state->current_token++;
+            if (state->tokens[state->current_token].token != identsym) {
+                print_error(4, "const, var, procedure must be followed by identifier", NULL, errorFile);
+            }
+            if (symbol_table_check_declaration(state, state->tokens[state->current_token].value, level) != -1) {
+                print_error(4, "symbol name has already been declared", state->tokens[state->current_token].value, errorFile);
+            }
+            add_to_symbol_table(state, 2, state->tokens[state->current_token].value, 0, level, numVars + 2);
+            state->current_token++;
+        } while (state->tokens[state->current_token].token == commasym);
+
+        if (state->tokens[state->current_token].token != semicolonsym) {
+            print_error(5, "Semicolon or comma missing", NULL, errorFile);
+        }
+        state->current_token++;
+    }
+    return numVars;
+}
+
+void statement(CompilerState *state, FILE *errorFile, int level) {
+    if (state->tokens[state->current_token].token == identsym) {
+        int symIdx = symbol_table_check(state, state->tokens[state->current_token].value, level);
+        if (symIdx == -1) {
+            print_error(11, "Undeclared identifier", state->tokens[state->current_token].value, errorFile);
+        }
+        if (state->symbol_table[symIdx].kind != 2) {
+            print_error(12, "Assignment to constant or procedure is not allowed", NULL, errorFile);
+        }
+        state->current_token++;
+        if (state->tokens[state->current_token].token != becomessym) {
+            print_error(13, "Assignment operator expected", NULL, errorFile);
+        }
+        state->current_token++;
+        expression(state, errorFile, level);
+        emit(state, 4, level - state->symbol_table[symIdx].level, state->symbol_table[symIdx].addr); // STO
+    } else if (state->tokens[state->current_token].token == beginsym) {
+        do {
+            state->current_token++;
+            statement(state, errorFile, level);
+        } while (state->tokens[state->current_token].token == semicolonsym);
+        if (state->tokens[state->current_token].token != endsym) {
+            print_error(17, "Semicolon or end expected", NULL, errorFile);
+        }
+        state->current_token++;
+    } else if (state->tokens[state->current_token].token == ifsym) {
+        state->current_token++;
+        condition(state, errorFile, level);
+        int jpcIdx = state->code_index;
+        emit(state, 8, 0, 0); // JPC
+        if (state->tokens[state->current_token].token != thensym) {
+            print_error(16, "then expected", NULL, errorFile);
+        }
+        state->current_token++;
+        statement(state, errorFile, level);
+        state->code[jpcIdx].m = state->code_index;
+        if (state->tokens[state->current_token].token == elsesym) {
+            int jmpIdx = state->code_index;
+            emit(state, 7, 0, 0); // JMP
+            state->current_token++;
+            statement(state, errorFile, level);
+            state->code[jmpIdx].m = state->code_index;
+        }
+        if (state->tokens[state->current_token].token != fisym) {
+            print_error(19, "Incorrect symbol following statement", NULL, errorFile);
+        }
+        state->current_token++;
+    } else if (state->tokens[state->current_token].token == whilesym) {
+        state->current_token++;
+        int loopIdx = state->code_index;
+        condition(state, errorFile, level);
+        int jpcIdx = state->code_index;
+        emit(state, 8, 0, 0); // JPC
+        if (state->tokens[state->current_token].token != dosym) {
+            print_error(18, "do expected", NULL, errorFile);
+        }
+        state->current_token++;
+        statement(state, errorFile, level);
+        emit(state, 7, 0, loopIdx); // JMP
+        state->code[jpcIdx].m = state->code_index;
+    } else if (state->tokens[state->current_token].token == readsym) {
+        state->current_token++;
+        if (state->tokens[state->current_token].token != identsym) {
+            print_error(14, "call must be followed by an identifier", NULL, errorFile);
+        }
+        int symIdx = symbol_table_check(state, state->tokens[state->current_token].value, level);
+        if (symIdx == -1) {
+            print_error(11, "Undeclared identifier", state->tokens[state->current_token].value, errorFile);
+        }
+        if (state->symbol_table[symIdx].kind != 2) {
+            print_error(15, "Call of a constant or variable is meaningless", NULL, errorFile);
+        }
+        state->current_token++;
+        emit(state, 9, 0, 2); // READ input
+        emit(state, 4, level - state->symbol_table[symIdx].level, state->symbol_table[symIdx].addr); // STO
+    } else if (state->tokens[state->current_token].token == writesym) {
+        state->current_token++;
+        expression(state, errorFile, level);
+        emit(state, 9, 0, 1); // WRITE output
+    } else if (state->tokens[state->current_token].token == callsym) {
+        state->current_token++;
+        if (state->tokens[state->current_token].token != identsym) {
+            print_error(14, "call must be followed by an identifier", NULL, errorFile);
+        }
+        int symIdx = symbol_table_check(state, state->tokens[state->current_token].value, level);
+        if (symIdx == -1) {
+            print_error(11, "Undeclared identifier", state->tokens[state->current_token].value, errorFile);
+        }
+        if (state->symbol_table[symIdx].kind != 3) {
+            print_error(15, "Call of a constant or variable is meaningless", state->tokens[state->current_token].value, errorFile);
+        }
+        state->current_token++;
+        emit(state, 5, level - state->symbol_table[symIdx].level, state->symbol_table[symIdx].addr); // CAL
+    }
+}
+
+void condition(CompilerState *state, FILE *errorFile, int level) {
+    if (state->tokens[state->current_token].token == oddsym) {
+        state->current_token++;
+        expression(state, errorFile, level);
+        emit(state, 2, 0, 11); // ODD
+    } else {
+        expression(state, errorFile, level);
+        if (state->tokens[state->current_token].token == eqsym) {
+            state->current_token++;
+            expression(state, errorFile, level);
+            emit(state, 2, 0, 5); // EQL
+        } else if (state->tokens[state->current_token].token == neqsym) {
+            state->current_token++;
+            expression(state, errorFile, level);
+            emit(state, 2, 0, 6); // NEQ
+        } else if (state->tokens[state->current_token].token == lessym) {
+            state->current_token++;
+            expression(state, errorFile, level);
+            emit(state, 2, 0, 7); // LSS
+        } else if (state->tokens[state->current_token].token == leqsym) {
+            state->current_token++;
+            expression(state, errorFile, level);
+            emit(state, 2, 0, 8); // LEQ
+        } else if (state->tokens[state->current_token].token == gtrsym) {
+            state->current_token++;
+            expression(state, errorFile, level);
+            emit(state, 2, 0, 9); // GTR
+        } else if (state->tokens[state->current_token].token == geqsym) {
+            state->current_token++;
+            expression(state, errorFile, level);
+            emit(state, 2, 0, 10); // GEQ
         } else {
-            buffer[0] = c;
-            buffer[1] = '\0';
-            switch (c) {
-                case '+': addLexeme(buffer, plussym, NULL); break;
-                case '-': addLexeme(buffer, minussym, NULL); break;
-                case '*': addLexeme(buffer, multsym, NULL); break;
-                case '/':
-                    if (input[i + 1] == '*') {
-                        i += 2;
-                        while (i < length - 1 && !(input[i] == '*' && input[i + 1] == '/')) {
-                            i++;
-                        }
-                        if (i < length - 1) {
-                            i++;
-                        } else {
-                            addLexeme("/*", errorsym, "Unterminated comment");
-                        }
-                    } else {
-                        addLexeme(buffer, slashsym, NULL);
-                    }
-                    break;
-                case '=': addLexeme(buffer, eqlsym, NULL); break;
-                case '<':
-                    if (input[i + 1] == '>') {
-                        buffer[1] = '>';
-                        buffer[2] = '\0';
-                        addLexeme(buffer, neqsym, NULL);
-                        i++;
-                    } else if (input[i + 1] == '=') {
-                        buffer[1] = '=';
-                        buffer[2] = '\0';
-                        addLexeme(buffer, leqsym, NULL);
-                        i++;
-                    } else {
-                        addLexeme(buffer, lessym, NULL);
-                    }
-                    break;
-                case '>':
-                    if (input[i + 1] == '=') {
-                        buffer[1] = '=';
-                        buffer[2] = '\0';
-                        addLexeme(buffer, geqsym, NULL);
-                        i++;
-                    } else {
-                        addLexeme(buffer, gtrsym, NULL);
-                    }
-                    break;
-                case ':':
-                    if (input[i + 1] == '=') {
-                        buffer[1] = '=';
-                        buffer[2] = '\0';
-                        addLexeme(buffer, becomessym, NULL);
-                        i++;
-                    } else {
-                        addLexeme(buffer, errorsym, "Invalid character");
-                    }
-                    break;
-                case ';': addLexeme(buffer, semicolonsym, NULL); break;
-                case ',': addLexeme(buffer, commasym, NULL); break;
-                case '.': addLexeme(buffer, periodsym, NULL); break;
-                case '(': addLexeme(buffer, lparentsym, NULL); break;
-                case ')': addLexeme(buffer, rparentsym, NULL); break;
-                default:
-                    addLexeme(buffer, errorsym, "Invalid character");
-                    break;
-            }
+            print_error(20, "Relational operator expected", NULL, errorFile);
         }
     }
 }
 
-// Function to read the input file
-void readInputFile(const char *filename, char *buffer, int size) {
-    FILE *file = fopen(filename, "r");
-    if (!file) {
-        perror("Error opening file");
-        exit(EXIT_FAILURE);
-    }
-
-    int index = 0;
-    char c;
-    while ((c = fgetc(file)) != EOF && index < size - 1) {
-        buffer[index++] = c;
-    }
-    buffer[index] = '\0';
-    fclose(file);
-}
-
-// Function to write the output file
-void writeOutputFile(const char *filename) {
-    FILE *file = fopen(filename, "w");
-    if (!file) {
-        perror("Error opening file");
-        exit(EXIT_FAILURE);
-    }
-
-    fprintf(file, "Line OP L M\n");
-    for (int i = 0; i < code_index; i++) {
-        fprintf(file, "%d %s %d %d\n", i, code[i].op, code[i].l, code[i].m);
-    }
-
-    fclose(file);
-}
-
-// Function to write the elf file
-void writeElfFile(const char *filename) {
-    FILE *file = fopen(filename, "w");
-    if (!file) {
-        perror("Error opening file");
-        exit(EXIT_FAILURE);
-    }
-
-    for (int i = 0; i < code_index; i++) {
-        int op = 0;
-        if (strcmp(code[i].op, "JMP") == 0) op = 7;
-        else if (strcmp(code[i].op, "INC") == 0) op = 6;
-        else if (strcmp(code[i].op, "LIT") == 0) op = 1;
-        else if (strcmp(code[i].op, "STO") == 0) op = 4;
-        else if (strcmp(code[i].op, "LOD") == 0) op = 3;
-        else if (strcmp(code[i].op, "SYS") == 0) op = 9;
-        else if (strcmp(code[i].op, "ADD") == 0) op = 2;
-        else if (strcmp(code[i].op, "SUB") == 0) op = 2;
-        else if (strcmp(code[i].op, "MUL") == 0) op = 2;
-        else if (strcmp(code[i].op, "DIV") == 0) op = 2;
-        else if (strcmp(code[i].op, "EQL") == 0) op = 2;
-        else if (strcmp(code[i].op, "NEQ") == 0) op = 2;
-        else if (strcmp(code[i].op, "LSS") == 0) op = 2;
-        else if (strcmp(code[i].op, "LEQ") == 0) op = 2;
-        else if (strcmp(code[i].op, "GTR") == 0) op = 2;
-        else if (strcmp(code[i].op, "GEQ") == 0) op = 2;
-        else if (strcmp(code[i].op, "JPC") == 0) op = 8;
-        else if (strcmp(code[i].op, "ODD") == 0) op = 2;
-
-        fprintf(file, "%d %d %d\n", op, code[i].l, code[i].m);
-    }
-
-    fclose(file);
-}
-
-// Function to handle errors
-void error(const char *message, const char *detail) {
-    if (detail) {
-        fprintf(stderr, "Error: %s %s\n", message, detail);
+void expression(CompilerState *state, FILE *errorFile, int level) {
+    int addop;
+    if (state->tokens[state->current_token].token == plussym || state->tokens[state->current_token].token == minussym) {
+        addop = state->tokens[state->current_token].token;
+        state->current_token++;
+        term(state, errorFile, level);
+        if (addop == minussym) {
+            emit(state, 2, 0, 2); // SUB
+        }
     } else {
-        fprintf(stderr, "Error: %s\n", message);
+        term(state, errorFile, level);
     }
-    exit(EXIT_FAILURE);
-}
-
-// Function to display the input program
-void displayInput(const char *input) {
-    printf("Input Program:\n%s\n", input);
-}
-
-// Function to display the generated code
-void displayGeneratedCode() {
-    printf("Generated Code (Assembly):\n");
-    for (int i = 0; i < code_index; i++) {
-        printf("%d %s %d %d\n", i, code[i].op, code[i].l, code[i].m);
+    while (state->tokens[state->current_token].token == plussym || state->tokens[state->current_token].token == minussym) {
+        addop = state->tokens[state->current_token].token;
+        state->current_token++;
+        term(state, errorFile, level);
+        if (addop == plussym) {
+            emit(state, 2, 0, 1); // ADD
+        } else {
+            emit(state, 2, 0, 2); // SUB
+        }
     }
 }
 
-// Main function
-int main(int argc, char *argv[]) {
-    if (argc != 2) {
-        fprintf(stderr, "Usage: %s <input_file>\n", argv[0]);
-        return EXIT_FAILURE;
+void term(CompilerState *state, FILE *errorFile, int level) {
+    factor(state, errorFile, level);
+    while (state->tokens[state->current_token].token == multsym || state->tokens[state->current_token].token == slashsym) {
+        int mulop = state->tokens[state->current_token].token;
+        state->current_token++;
+        factor(state, errorFile, level);
+        if (mulop == multsym) {
+            emit(state, 2, 0, 3); // MUL
+        } else {
+            emit(state, 2, 0, 4); // DIV
+        }
     }
-
-    const int bufferSize = 10000;
-    char input[bufferSize];
-
-    readInputFile(argv[1], input, bufferSize);
-    displayInput(input);
-    processInput(input);
-
-    program();
-
-    printf("No errors, program is syntactically correct\n");
-
-    displayGeneratedCode();
-    writeOutputFile("output.txt");
-    writeElfFile("elf.txt");
-
-    return 0;
 }
 
-// Function to check the symbol table
-int symbol_table_check(const char *name) {
-    for (int i = 0; i < symbol_count; i++) {
-        printf("Debug: Checking symbol %s against %s (kind: %d, marked: %d)\n", name, symbol_table[i].name, symbol_table[i].kind, symbol_table[i].mark);
-        if (strcmp(symbol_table[i].name, name) == 0 && symbol_table[i].mark == 0) {
+void factor(CompilerState *state, FILE *errorFile, int level) {
+    if (state->tokens[state->current_token].token == identsym) {
+        int symIdx = symbol_table_check(state, state->tokens[state->current_token].value, level);
+        if (symIdx == -1) {
+            print_error(11, "Undeclared identifier", state->tokens[state->current_token].value, errorFile);
+        }
+        if (state->symbol_table[symIdx].kind == 3) {
+            print_error(21, "Expression must not contain a procedure identifier", state->tokens[state->current_token].value, errorFile);
+        }
+        state->current_token++;
+        if (state->symbol_table[symIdx].kind == 1) { // const
+            emit(state, 1, 0, state->symbol_table[symIdx].val); // LIT
+        } else { // var
+            emit(state, 3, level - state->symbol_table[symIdx].level, state->symbol_table[symIdx].addr); // LOD
+        }
+    } else if (state->tokens[state->current_token].token == numbersym) {
+        emit(state, 1, 0, atoi(state->tokens[state->current_token].value)); // LIT
+        state->current_token++;
+    } else if (state->tokens[state->current_token].token == lparentsym) {
+        state->current_token++;
+        expression(state, errorFile, level);
+        if (state->tokens[state->current_token].token != rparentsym) {
+            print_error(22, "Right parenthesis missing", NULL, errorFile);
+        }
+        state->current_token++;
+    } else {
+        print_error(23, "The preceding factor cannot begin with this symbol", NULL, errorFile);
+    }
+}
+
+// Check symbol table for existing symbol
+int symbol_table_check(CompilerState *state, char *name, int level) {
+    for (int i = state->symbol_table_index - 1; i >= 0; i--) {
+        if (strcmp(state->symbol_table[i].name, name) == 0 && state->symbol_table[i].level <= level && state->symbol_table[i].mark == 0) {
             return i;
         }
     }
     return -1;
 }
 
-
-
-// Function to add a symbol to the symbol table
-void add_symbol(int kind, const char *name, int val, int level, int addr) {
-    if (symbol_count >= MAX_SYMBOL_TABLE_SIZE) {
-        error("Symbol table overflow", NULL);
+// Check if symbol is already declared in the table
+int symbol_table_check_declaration(CompilerState *state, char *name, int level) {
+    for (int i = state->symbol_table_index - 1; i >= 0; i--) {
+        if (strcmp(state->symbol_table[i].name, name) == 0 && state->symbol_table[i].level == level) {
+            return i;
+        }
     }
-    symbol_table[symbol_count].kind = kind;
-    strncpy(symbol_table[symbol_count].name, name, MAX_IDENT_LEN);
-    symbol_table[symbol_count].val = val;
-    symbol_table[symbol_count].level = level;
-    symbol_table[symbol_count].addr = addr;
-    symbol_table[symbol_count].mark = 0;
-    symbol_count++;
+    return -1;
 }
 
-// Function to emit code
-void emit(const char *op, int l, int m) {
-    if (code_index >= MAX_CODE_LENGTH) {
-        error("Code size exceeded", NULL);
-    }
-    strncpy(code[code_index].op, op, 4);
-    code[code_index].l = l;
-    code[code_index].m = m;
-    code_index++;
+// Add a symbol to the table
+void add_to_symbol_table(CompilerState *state, int kind, char *name, int val, int level, int addr) {
+    state->symbol_table[state->symbol_table_index].kind = kind;
+    strncpy(state->symbol_table[state->symbol_table_index].name, name, sizeof(state->symbol_table[state->symbol_table_index].name) - 1);
+    state->symbol_table[state->symbol_table_index].name[sizeof(state->symbol_table[state->symbol_table_index].name) - 1] = '\0';
+    state->symbol_table[state->symbol_table_index].val = val;
+    state->symbol_table[state->symbol_table_index].level = level;
+    state->symbol_table[state->symbol_table_index].addr = addr;
+    state->symbol_table[state->symbol_table_index].mark = 0;
+    state->symbol_table_index++;
 }
 
-// Function to mark all symbols
-void mark_all_symbols() {
-    for (int i = 0; i < symbol_count; i++) {
-        symbol_table[i].mark = 1;
-    }
-}
-void program() {
-    emit("JMP", 0, 3);
-    block(0, 0);  // Pass the initial level and tx
-    if (lexemes[current_token].token != periodsym) {
-        error("program must end with period", NULL);
-    }
-    emit("SYS", 0, 3);
-    mark_all_symbols();
-}
-
-
-// Block is a helper function for program that handles the base case of the recursion and the different types of blocks that can be declared
-void block(int level, int tx) {
-    const_declaration();
-    int numVars = var_declaration();
-    emit("INC", 0, 3 + numVars);
-
-    while (lexemes[current_token].token == procsym) {
-        current_token++;
-        if (lexemes[current_token].token != identsym) {
-            error("procedure must be followed by identifier", NULL);
-        }
-        add_symbol(3, lexemes[current_token].lexeme, 0, level, code_index);
-        current_token++;
-        if (lexemes[current_token].token != semicolonsym) {
-            error("semicolon expected after procedure declaration", NULL);
-        }
-        current_token++;
-        block(level + 1, tx);  // Pass the correct parameters
-        if (lexemes[current_token].token != semicolonsym) {
-            error("semicolon expected after procedure block", NULL);
-        }
-        current_token++;
-    }
-
-    statement();
-}
-
-
-
-// const_declaration is a helper function for block that handles the declaration of constants
-void const_declaration() {
-    if (lexemes[current_token].token == constsym) {
-        do {
-            current_token++;
-            if (lexemes[current_token].token != identsym) {
-                error("const must be followed by identifier", NULL);
-            }
-            if (symbol_table_check(lexemes[current_token].lexeme) != -1) {
-                error("symbol name has already been declared", lexemes[current_token].lexeme);
-            }
-            char name[MAX_IDENT_LEN + 1];
-            strcpy(name, lexemes[current_token].lexeme);
-            current_token++;
-            if (lexemes[current_token].token != eqlsym) {
-                error("constants must be assigned with =", NULL);
-            }
-            current_token++;
-            if (lexemes[current_token].token != numbersym) {
-                error("constants must be assigned an integer value", NULL);
-            }
-            int value = atoi(lexemes[current_token].lexeme);
-            add_symbol(1, name, value, current_level, 0);
-            current_token++;
-        } while (lexemes[current_token].token == commasym);
-        if (lexemes[current_token].token != semicolonsym) {
-            error("constant declarations must be followed by a semicolon", NULL);
-        }
-        current_token++;
-    }
-}
-
-// var_declaration is a helper function for block that handles the declaration of variables
-int var_declaration() {
-    int numVars = 0;
-    if (lexemes[current_token].token == varsym) {
-        do {
-            current_token++;
-            if (lexemes[current_token].token != identsym) {
-                error("var must be followed by identifier", NULL);
-            }
-            if (symbol_table_check(lexemes[current_token].lexeme) != -1) {
-                error("symbol name has already been declared", lexemes[current_token].lexeme);
-            }
-            add_symbol(2, lexemes[current_token].lexeme, 0, current_level, 3 + numVars);
-            numVars++;
-            current_token++;
-        } while (lexemes[current_token].token == commasym);
-        if (lexemes[current_token].token != semicolonsym) {
-            error("variable declarations must be followed by a semicolon", NULL);
-        }
-        current_token++;
-    }
-    return numVars;
-}
-
-// procedure_declaration is a helper function for block that handles the declaration of procedures
-void statement() {
-    printf("Debug: Entering statement with token: %d (%s)\n", lexemes[current_token].token, lexemes[current_token].lexeme);
-
-    if (lexemes[current_token].token == identsym) {
-        int symIdx = symbol_table_check(lexemes[current_token].lexeme);
-        printf("Debug: Found identifier %s with symIdx: %d\n", lexemes[current_token].lexeme, symIdx);
-
-        if (symIdx == -1) {
-            error("undeclared identifier", lexemes[current_token].lexeme);
-        }
-
-        // Check if the symbol is a constant or a procedure
-        if (symbol_table[symIdx].kind == 1) {
-            error("Assignment to constant is not allowed", NULL);
-        }
-        if (symbol_table[symIdx].kind == 3) {
-            error("Assignment to procedure is not allowed", NULL);
-        }
-
-        current_token++;
-        if (lexemes[current_token].token != becomessym) {
-            error("assignment statements must use :=", NULL);
-        }
-
-        current_token++;
-        printf("Debug: Processing assignment statement for %s\n", lexemes[current_token - 2].lexeme);
-        expression();
-        emit("STO", current_level - symbol_table[symIdx].level, symbol_table[symIdx].addr);
-    } else if (lexemes[current_token].token == beginsym) {
-        printf("Debug: Processing begin block\n");
-        current_token++;
-        while (lexemes[current_token].token != endsym) {
-            statement();
-            if (lexemes[current_token].token == semicolonsym) {
-                current_token++;
-            } else if (lexemes[current_token].token != endsym) {
-                error("semicolon expected between statements or at end of block", NULL);
-            }
-        }
-        if (lexemes[current_token].token != endsym) {
-            error("begin must be followed by end", NULL);
-        }
-        current_token++;
-    } else if (lexemes[current_token].token == ifsym) {
-        current_token++;
-        condition();
-        int jpcIdx = code_index;
-        emit("JPC", 0, 0);
-        if (lexemes[current_token].token != thensym) {
-            error("if must be followed by then", NULL);
-        }
-        current_token++;
-        statement();
-        code[jpcIdx].m = code_index;
-    } else if (lexemes[current_token].token == whilesym) {
-        current_token++;
-        int loopIdx = code_index;
-        condition();
-        if (lexemes[current_token].token != dosym) {
-            error("while must be followed by do", NULL);
-        }
-        current_token++;
-        int jpcIdx = code_index;
-        emit("JPC", 0, 0);
-        statement();
-        emit("JMP", 0, loopIdx);
-        code[jpcIdx].m = code_index;
-    } else if (lexemes[current_token].token == readsym) {
-        current_token++;
-        if (lexemes[current_token].token != identsym) {
-            error("read must be followed by identifier", NULL);
-        }
-        int symIdx = symbol_table_check(lexemes[current_token].lexeme);
-        if (symIdx == -1) {
-            error("undeclared identifier", lexemes[current_token].lexeme);
-        }
-        if (symbol_table[symIdx].kind != 2) {
-            error("only variable values may be altered", NULL);
-        }
-        current_token++;
-        emit("SYS", 0, 2); // Assuming SYS 2 is read
-        emit("STO", current_level - symbol_table[symIdx].level, symbol_table[symIdx].addr);
-    } else if (lexemes[current_token].token == writesym) {
-        current_token++;
-        expression();
-        emit("SYS", 0, 1); // Assuming SYS 1 is write
-    } else if (lexemes[current_token].token == callsym) {
-        current_token++;
-        printf("Debug: Processing call statement\n");
-        if (lexemes[current_token].token != identsym) {
-            error("call must be followed by an identifier", NULL);
-        }
-        int symIdx = symbol_table_check(lexemes[current_token].lexeme);
-        printf("Debug: Processing call with symIdx: %d\n", symIdx);
-        if (symIdx == -1) {
-            error("undeclared identifier", NULL);
-        }
-        if (symbol_table[symIdx].kind != 3) {
-            error("call of a constant or variable is meaningless", NULL);
-        }
-        current_token++;
-        emit("CAL", current_level - symbol_table[symIdx].level, symbol_table[symIdx].addr);
-    } else {
-        printf("Debug: Invalid statement with token: %d (%s)\n", lexemes[current_token].token, lexemes[current_token].lexeme);
-        error("Invalid statement", lexemes[current_token].lexeme);
-    }
-}
-
-
-// condition is a helper function for statement that handles the different types of conditions that can be declared in a statement
-void condition() {
-    if (lexemes[current_token].token == oddsym) {
-        current_token++;
-        expression();
-        emit("ODD", 0, 0);
-    } else {
-        expression();
-        if (lexemes[current_token].token != eqlsym && lexemes[current_token].token != neqsym &&
-            lexemes[current_token].token != lessym && lexemes[current_token].token != leqsym &&
-            lexemes[current_token].token != gtrsym && lexemes[current_token].token != geqsym) {
-            error("condition must contain comparison operator", NULL);
-        }
-        token_type relOp = lexemes[current_token].token;
-        current_token++;
-        expression();
-        switch (relOp) {
-            case eqlsym: emit("EQL", 0, 0); break;
-            case neqsym: emit("NEQ", 0, 0); break;
-            case lessym: emit("LSS", 0, 0); break;
-            case leqsym: emit("LEQ", 0, 0); break;
-            case gtrsym: emit("GTR", 0, 0); break;
-            case geqsym: emit("GEQ", 0, 0); break;
-            default:
-                error("condition must contain comparison operator", NULL);
+// Mark symbols in the table
+void mark_symbols(CompilerState *state, int level) {
+    for (int i = state->symbol_table_index - 1; i >= 0; i--) {
+        if (state->symbol_table[i].level == level && state->symbol_table[i].mark == 0) {
+            state->symbol_table[i].mark = 1;
         }
     }
 }
 
-// expression is a helper function for condition that handles the different types of expressions that can be declared in a condition
-void expression() {
-    printf("Debug: Entering expression with token: %d (%s)\n", lexemes[current_token].token, lexemes[current_token].lexeme);
-
-    if (lexemes[current_token].token == plussym || lexemes[current_token].token == minussym) {
-        token_type addOp = lexemes[current_token].token;
-        current_token++;
-        term();
-        if (addOp == minussym) {
-            emit("NEG", 0, 0);
-        }
-    } else {
-        term();
+// Emit a code instruction
+void emit(CompilerState *state, int op, int l, int m) {
+    if (state->code_index >= MAX_CODE_LENGTH) {
+        fprintf(stderr, "Error: Code segment overflow.\n");
+        exit(1);
     }
+    state->code[state->code_index].op = op;
+    state->code[state->code_index].l = l;
+    state->code[state->code_index].m = m;
+    state->code_index++;
+}
 
-    while (lexemes[current_token].token == plussym || lexemes[current_token].token == minussym) {
-        token_type addOp = lexemes[current_token].token;
-        current_token++;
-        term();
-        if (addOp == plussym) {
-            emit("ADD", 0, 0);
-        } else {
-            emit("SUB", 0, 0);
+// Print generated code
+void printCode(const CompilerState *state, FILE *outputFile) {
+    fprintf(outputFile, "Generated Code:\n");
+    fprintf(outputFile, "Line    OP    L    M\n");
+    for (int i = 0; i < state->code_index; i++) {
+        char *op_name;
+        switch (state->code[i].op) {
+            case 1: op_name = "LIT"; break;
+            case 2: op_name = "OPR"; break;
+            case 3: op_name = "LOD"; break;
+            case 4: op_name = "STO"; break;
+            case 5: op_name = "CAL"; break;
+            case 6: op_name = "INC"; break;
+            case 7: op_name = "JMP"; break;
+            case 8: op_name = "JPC"; break;
+            case 9: op_name = "SYS"; break;
+            default: op_name = "???"; break;
         }
+        fprintf(outputFile, "%3d %6s %4d %4d\n", i, op_name, state->code[i].l, state->code[i].m);
     }
 }
 
-void term() {
-    printf("Debug: Entering term with token: %d (%s)\n", lexemes[current_token].token, lexemes[current_token].lexeme);
-    factor();
-    while (lexemes[current_token].token == multsym || lexemes[current_token].token == slashsym) {
-        token_type mulOp = lexemes[current_token].token;
-        current_token++;
-        factor();
-        if (mulOp == multsym) {
-            emit("MUL", 0, 0);
-        } else {
-            emit("DIV", 0, 0);
-        }
+// Output ELF file
+void outputElfFile(const CompilerState *state) {
+    FILE *elfFile = fopen("elf.txt", "w");
+    if (!elfFile) {
+        perror("Error opening elf.txt file");
+        exit(1);
     }
+
+    for (int i = 0; i < state->code_index; i++) {
+        fprintf(elfFile, "%d %d %d\n", state->code[i].op, state->code[i].l, state->code[i].m);
+    }
+
+    fclose(elfFile);
 }
 
-void factor() {
-    printf("Debug: Entering factor with token: %d (%s)\n", lexemes[current_token].token, lexemes[current_token].lexeme);
+// Print symbol table
+void printsymbols(const CompilerState *state) {
+    printf("\nSymbol Table:\n\n");
+    printf("Kind | Name        | Value | Level | Address | Mark\n");
+    printf("---------------------------------------------------\n");
 
-    if (lexemes[current_token].token == identsym) {
-        int symIdx = symbol_table_check(lexemes[current_token].lexeme);
-        printf("Debug: Found identifier %s with symIdx: %d\n", lexemes[current_token].lexeme, symIdx);
-
-        if (symIdx == -1) {
-            error("undeclared identifier", lexemes[current_token].lexeme);
-        }
-
-        // Check if the symbol is a procedure
-        if (symbol_table[symIdx].kind == 3) {
-            error("Expression cannot contain a procedure identifier", NULL);
-        }
-
-        if (symbol_table[symIdx].kind == 1) { // Constant
-            emit("LIT", 0, symbol_table[symIdx].val);
-        } else { // Variable
-            emit("LOD", current_level - symbol_table[symIdx].level, symbol_table[symIdx].addr);
-        }
-        current_token++;
-    } else if (lexemes[current_token].token == numbersym) {
-        emit("LIT", 0, atoi(lexemes[current_token].lexeme));
-        current_token++;
-    } else if (lexemes[current_token].token == lparentsym) {
-        current_token++;
-        expression();
-        if (lexemes[current_token].token != rparentsym) {
-            error("right parenthesis must follow left parenthesis", NULL);
-        }
-        current_token++;
-    } else {
-        error("arithmetic equations must contain operands, parentheses, numbers, or symbols", NULL);
+    for (int h = 0; h < state->symbol_table_index; h++) {
+        printf("%4d | %11s | %5d | %5d | %7d | %5d\n",
+            state->symbol_table[h].kind,
+            state->symbol_table[h].name,
+            state->symbol_table[h].val,
+            state->symbol_table[h].level,
+            state->symbol_table[h].addr,
+            state->symbol_table[h].mark);
     }
-}

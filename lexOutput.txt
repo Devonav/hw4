@@ -1,0 +1,11 @@
+Lexeme Table:
+
+lexeme          token type
+procedure       30   
+;               18   
+begin           21   
+end             22   
+.               19   
+
+Token List:
+30 18 21 22 19

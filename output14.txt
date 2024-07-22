@@ -1,7 +1,0 @@
-Source Program:
-const a = 1;
-begin
-    a := 2;
-end.
-
-Error: Assignment to constant or procedure is not allowed

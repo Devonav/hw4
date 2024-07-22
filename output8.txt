@@ -1,10 +1,1 @@
-Source Program:
-procedure proc1;
-begin
-  if x = 1 then call proc1;
-end;
-begin
-  proc1;
-end.
-
-Error: Call must be followed by an identifier
+***** Error number 14: call must be followed by an identifier

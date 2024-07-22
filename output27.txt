@@ -1,1 +1,0 @@
-Error: Error number 27, invalid symbol

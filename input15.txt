@@ -1,5 +1,0 @@
-var x, y;
-begin
-    call;
-    x := y + 1;
-end.

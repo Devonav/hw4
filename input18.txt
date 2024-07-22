@@ -1,8 +1,0 @@
-var x, y;
-procedure proc;
-begin
-    x := y + 1;
-end;
-begin
-    x := proc + 1;
-end.

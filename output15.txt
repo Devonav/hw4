@@ -1,8 +1,0 @@
-Source Program:
-var x, y;
-begin
-    call;
-    x := y + 1;
-end.
-
-Error: call must be followed by an identifier

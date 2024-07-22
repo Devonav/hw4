@@ -1,8 +1,8 @@
 var x;
-procedure proc1
+procedure test;
 begin
+    x := 2
 end;
 begin
-  x := 5
-  call proc1;
+    x := test + 1
 end.

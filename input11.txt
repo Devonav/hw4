@@ -1,7 +1,0 @@
-var x;
-procedure proc1;
-begin
-end;
-begin
-  x := 5 + proc1;
-end.

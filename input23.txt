@@ -1,4 +1,0 @@
-var x;
-begin
-  x := * 2;
-end.

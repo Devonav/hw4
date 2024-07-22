@@ -1,7 +1,0 @@
-Source Program:
-var , y;
-begin
-    x := y * 2;
-end.
-
-Error: const, var, procedure must be followed by an identifier

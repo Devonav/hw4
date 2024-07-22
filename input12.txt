@@ -1,7 +1,0 @@
-var x;
-procedure proc1;
-begin
-end;
-begin
-  proc1 := 10;
-end.

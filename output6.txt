@@ -1,8 +1,1 @@
-Source Program:
-var x, y;
-begin
-  read x
-  x := y + 1;
-end.
-
-Error: Semicolon between statements missing
+***** Error number 5: Semicolon or comma missing

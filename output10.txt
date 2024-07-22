@@ -1,7 +1,1 @@
-Source Program:
-var x;
-begin
-  while x > 1 do x := x - 1;
-end.
-
-No errors, program is syntactically correct
+***** Error number 21: Expression must not contain a procedure identifier test

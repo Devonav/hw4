@@ -1,8 +1,1 @@
-Source Program:
-const a = x;
-var x;
-begin
-  x := 1;
-end.
-
-Error: Constants must be assigned an integer value
+***** Error number 9: Period expected
