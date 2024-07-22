@@ -784,3 +784,4 @@ void printsymbols(const CompilerState *state) {
             state->symbol_table[h].addr,
             state->symbol_table[h].mark);
     }
+}
