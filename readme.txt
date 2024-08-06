@@ -187,8 +187,7 @@ Instructions for Running Test Cases:
 
 3. Verify the generated elf.txt file against the expected output (elf1.txt, elf2.txt, ..., elf10.txt).
 
-Note:
-Ensure the Virtual Machine (VM) implemented in HW1 is capable of running the generated code from elf.txt to validate the correctness of the compilation process.
+
 
 Submission Contents:
 - hw4compiler.c: Source code of the PL/0 compiler.
